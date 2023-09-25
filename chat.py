@@ -1,20 +1,28 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi_webtransport import WebTransport, WebTransportState
+import asyncio
 
 app = FastAPI()
-
-app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-@app.get("/", response_class=HTMLResponse)
-async def chat_page(request: WebTransport):
-    state = request.state
+# Store messages in-memory (you might want to use a database in production)
+messages = []
 
-    if state == WebTransportState.ESTABLISHED:
-        return templates.TemplateResponse("chat.html", {"request": request})
+@app.get("/", response_class=HTMLResponse)
+async def chat_page(request: HTTPException):
+    return templates.TemplateResponse("chat.html", {"request": request})
+
+@app.post("/send_message/")
+async def send_message(message: str):
+    messages.append(message)
+    return {"message": "Message sent successfully"}
+
+@app.get("/get_messages/")
+async def get_messages(last_index: int = 0):
+    while last_index >= len(messages):
+        await asyncio.sleep(1)  # Long-polling, wait for new messages
+    return messages[last_index:]
 
 if __name__ == "__main__":
     import uvicorn
